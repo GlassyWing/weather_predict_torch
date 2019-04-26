@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 from weather.dataset import WeatherDataset
 import torch
 import numpy as np
+from time import time
 
 
 class ModelStateCheckpoint:
@@ -62,6 +63,7 @@ def weather_train(net: nn.Module,
         running_loss = 0.0
         train_loss = 0.0
         logs = {}
+        time_since_last = time()
         for i, data in enumerate(train_dataloader, 0):
             x, y, addition = data.values()
             x, y, addition = x.float(), y.float(), addition.float()
@@ -80,6 +82,7 @@ def weather_train(net: nn.Module,
                 train_loss = running_loss / log_steps
                 print(f"[{epoch + 1:3d} {i + 1: 5d}] loss: {running_loss / log_steps:.5f} ")
                 running_loss = 0.0
+        time_curr = time()
 
         logs['loss'] = train_loss
 
@@ -97,7 +100,11 @@ def weather_train(net: nn.Module,
 
             val_loss = val_loss / len(test_dataloader)
             logs['val_loss'] = val_loss
-            print(f"[{epoch + 1:3d}] val_loss: {val_loss:.5f}")
+
+        print(
+            f"[{epoch + 1:3d}] - {(time_curr - time_since_last):.0f}s"
+            f" - {((time_curr - time_since_last) * 1000 // len(train_dataloader)):.0f}ms/step"
+            f" - loss: {train_loss:.5f} - val_loss: {val_loss:.5f}")
 
         if model_check_point is not None:
             model_check_point.on_epoch_end(epoch, logs)

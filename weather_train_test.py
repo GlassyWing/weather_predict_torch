@@ -20,12 +20,12 @@ if __name__ == '__main__':
     train_wd = WeatherDataset("data/train_weather.csv",
                               "data/places.csv",
                               is_reverse=True,
-                              transform=standard,
+                              transform=normalize,
                               seq_len=seq_len)
     test_wd = WeatherDataset("data/test_weather.csv",
                              "data/places.csv",
                              is_reverse=True,
-                             transform=standard,
+                             transform=normalize,
                              seq_len=seq_len)
     wm = WeatherModel(3, 8, 128, 64, seq_len, 2)
 

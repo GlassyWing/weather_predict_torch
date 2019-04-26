@@ -35,8 +35,9 @@ class BaseModel(nn.Module, ABC):
 
 class AdaptiveInstanceNorm(nn.Module, ABC):
 
-    def __init__(self,addition_size, hidden_size, seq_len=15, num_layers=2, dropout=0.2):
+    def __init__(self, addition_size, hidden_size, seq_len=15, num_layers=2, dropout=0.2):
         super().__init__()
+        self.norm = nn.InstanceNorm1d(seq_len)
         self.lstm = nn.LSTM(input_size=addition_size,
                             hidden_size=hidden_size,
                             num_layers=num_layers,
@@ -49,7 +50,7 @@ class AdaptiveInstanceNorm(nn.Module, ABC):
     def forward(self, x, addition):
         lstm_output, _ = self.lstm(addition)
         gamma, beta = self.linear(lstm_output).chunk(2, 2)  # [b, s, 1]
-        # x = self.norm(x)
+        x = self.norm(x)
         return x * gamma + beta
 
 
@@ -73,11 +74,11 @@ class WeatherModel(nn.Module, ABC):
                                     num_layers=num_layers)
 
         self.adain = AdaptiveInstanceNorm(
-                                          addition_size=addition_size,
-                                          hidden_size=hidden_size,
-                                          seq_len=max_len,
-                                          num_layers=2,
-                                          dropout=dropout)
+            addition_size=addition_size,
+            hidden_size=hidden_size,
+            seq_len=max_len,
+            num_layers=2,
+            dropout=dropout)
 
     def forward(self, input, addition):
         """
@@ -88,6 +89,8 @@ class WeatherModel(nn.Module, ABC):
         """
 
         adain_output = self.adain(input, addition)
-        out, attn_weights = self.base_model(adain_output)  # [b, s, input_size]
+        # x(1 + \alpha)
+        cross = input + adain_output
+        out, attn_weights = self.base_model(cross)  # [b, s, input_size]
 
         return out, attn_weights
