@@ -2,10 +2,10 @@ from abc import ABC
 from datetime import datetime
 from functools import reduce
 
-from torch.utils.data import Dataset
+import numpy as np
 import pandas as pd
 import torch
-import numpy as np
+from torch.utils.data import Dataset
 
 
 class Standardization:
@@ -129,6 +129,7 @@ class WeatherDataset(Dataset, ABC):
             self.conclusion = conclusion
 
         self.acc_sub_con = list(set(self.according) - set(self.conclusion))
+        self.acc_sub_con.sort()
 
         self.seq_len = seq_len
         self.index2place, self.place2index = get_place_dict(places_dict_path)
@@ -184,7 +185,6 @@ class WeatherDataset(Dataset, ABC):
         #     print(data.shape)
         #     raise ValueError()
 
-        # 顺序为逆序，需翻转
         x = data[self.conclusion][:-1].values
         y = data[self.conclusion][1:].values
         additional = data[self.acc_sub_con][:-1].values
@@ -211,11 +211,12 @@ class PreWeatherDataset(WeatherDataset):
 
     def __init__(self, weather_file_path, places_dict_path, **kwargs):
         super().__init__(weather_file_path, places_dict_path, **kwargs)
+        self.weather = self.weather[0: self.seq_len]
 
     def calculate_size(self):
         if self.num_place != 1:
             raise ValueError("所有气象数据的地点应相同！")
-        total_size = len(self.weather) - self.seq_len
+        total_size = len(self.weather) - self.seq_len + 1
         return total_size
 
     def get_place(self):
