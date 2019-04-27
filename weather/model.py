@@ -66,7 +66,7 @@ class WeatherModel(nn.Module, ABC):
                  dropout=0.2):
         super().__init__()
 
-        self.wave_model = BaseModel(input_size=input_size,
+        self.wave_model = BaseModel(input_size=input_size + addition_size,
                                     hidden_size=hidden_size,
                                     inner_hidden_size=inner_hidden_size,
                                     max_len=max_len,
@@ -79,13 +79,15 @@ class WeatherModel(nn.Module, ABC):
 
         self.fc = nn.Linear(inner_hidden_size, input_size)
 
-    def forward(self, input, addition):
+    def forward(self, x, addition):
         """
 
-        :param input: shape of [b, s, input_size]
+        :param x: shape of [b, s, input_size]
         :param addition: shape of [b, s, addition_size]
         :return:
         """
+
+        input = torch.cat((x, addition), dim=2)
         wave_out, attn_weights = self.wave_model(input)
         scale_out = self.scale(wave_out, addition)
 
