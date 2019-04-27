@@ -104,7 +104,8 @@ def weather_train(net: nn.Module,
         print(
             f"[{epoch + 1:3d}] - {(time_curr - time_since_last):.0f}s"
             f" - {((time_curr - time_since_last) * 1000 // len(train_dataloader)):.0f}ms/step"
-            f" - loss: {train_loss:.5f} - val_loss: {val_loss:.5f}")
+            f" - loss: {train_loss:.5f}"
+            + (f" - val_loss: {val_loss:.5f}" if test_dataset is not None else ""))
 
         if model_check_point is not None:
             model_check_point.on_epoch_end(epoch, logs)

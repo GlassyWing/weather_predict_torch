@@ -1,8 +1,8 @@
 from datetime import timedelta
 
+import pandas as pd
 import torch
 import torch.nn as nn
-import pandas as pd
 
 from weather.dataset import PreWeatherDataset
 
@@ -18,7 +18,7 @@ def weather_predict(net: nn.Module, pre_weather: PreWeatherDataset, num_future=1
     net.eval()
     curr_date = pre_weather.get_curr_date()
     place = pre_weather.get_place()
-    net.float()
+
     with torch.no_grad():
         for i in range(num_future):
             last_idx = len(pre_weather) - 1
