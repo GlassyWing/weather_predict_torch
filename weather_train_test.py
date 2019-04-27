@@ -12,7 +12,7 @@ pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 
 if __name__ == '__main__':
-    seq_len = 30
+    seq_len = 15
     normalize = Normalization(min=[0, 0, 0, -7.883, -5.3, -11.500, 0.000, 14.125, -4.042, 1.904, 1.775],
                               max=[1, 1, 1, 34.208, 41.000, 30.100, 10.758, 100.0, 45.575, 37.975, 36.971])
     standard = Standardization(mean=[0, 0, 0, 17.234, 22.226, 13.007, 0.184, 72.470, 20.198, 19.402, 19.407],
@@ -27,7 +27,7 @@ if __name__ == '__main__':
                              is_reverse=True,
                              transform=normalize,
                              seq_len=seq_len)
-    wm = WeatherModel(3, 8, 128, 64, seq_len, 2)
+    wm = WeatherModel(3, 8, 256, 128, seq_len, 2)
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     # device =  "cpu"
