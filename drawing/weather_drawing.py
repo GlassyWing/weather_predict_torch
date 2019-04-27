@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def weather_compare(true_data, fake_data, column):
+def weather_compare(true_data, fake_data, column, save_path=None):
     min_len = min(len(true_data), len(fake_data))
     true_data = true_data[:min_len]
     fake_data = fake_data[:min_len]
@@ -17,16 +17,17 @@ def weather_compare(true_data, fake_data, column):
     plt.figure(figsize=(15, 5))
     plt.plot(xs, ys)
     plt.legend(['true', 'fake'])
-    # plt.savefig("../assets/weather.png")
+    if save_path is not None:
+        plt.savefig(save_path)
     plt.show()
 
 
-def weather_draw(data, transform=None, condition=None, columns=None, reverse=False):
-    if columns is None:
-        columns = ['24_hours_avg_tem', '24_hours_max_tem',
-                   '24_hours_min_tem', '24_hours_avg_pre',
-                   '24_hours_avg_rhu', '24_hours_avg_gst',
-                   '24_hours_avg_gst_15cm', '24_hours_avg_gst_20cm']
+def weather_draw(data, transform=None, condition=None, reverse=False, save_path=None):
+    columns = ['24_hours_avg_tem', '24_hours_max_tem',
+               '24_hours_min_tem', '24_hours_avg_pre',
+               '24_hours_avg_rhu', '24_hours_avg_gst',
+               '24_hours_avg_gst_15cm', '24_hours_avg_gst_20cm']
+
     if type(data) == str:
         weather_df = pd.read_csv(data)
     else:
@@ -49,5 +50,6 @@ def weather_draw(data, transform=None, condition=None, columns=None, reverse=Fal
     plt.figure(figsize=(15, 5))
     plt.plot(xs, ys)
     plt.legend(columns)
-    # plt.savefig("../assets/weather.png")
+    if save_path is not None:
+        plt.savefig(save_path)
     plt.show()
