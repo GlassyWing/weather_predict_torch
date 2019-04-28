@@ -140,6 +140,10 @@ class WeatherDataset(Dataset, ABC):
         if is_reverse:
             self.weather = self.weather[::-1]
 
+        # 进行数据变换
+        if self.transform is not None:
+            self.weather[self.according] = self.transform(self.weather[self.according])
+
         self.places = self.weather['place'].unique().tolist()
         self.num_place = len(self.places)
         self.weathers = self.__split_by_place()
@@ -172,18 +176,7 @@ class WeatherDataset(Dataset, ABC):
             idx = idx[0] - 1
 
         offset = item - self.__breakpoint[idx]
-        data = self.weathers[idx + 1][offset: offset + 1 + self.seq_len].copy()
-
-        if self.transform is not None:
-            value = self.transform(data[self.according].values)
-            data.loc[:, self.according] = value
-
-        # if data.shape[0] != 16:
-        #     print(self.__breakpoint)
-        #     print(idx)
-        #     print(item)
-        #     print(data.shape)
-        #     raise ValueError()
+        data = self.weathers[idx + 1][offset: offset + 1 + self.seq_len]
 
         x = data[self.conclusion][:-1].values
         y = data[self.conclusion][1:].values
@@ -235,10 +228,7 @@ class PreWeatherDataset(WeatherDataset):
         self.weather = self.weather.append(value, ignore_index=True, sort=False)
 
     def __getitem__(self, item):
-        data = self.weather[item: item + self.seq_len].copy()
-
-        if self.transform is not None:
-            data[self.according] = self.transform(data[self.according].values)
+        data = self.weather[item: item + self.seq_len]
 
         input = data[self.conclusion].values
         addition = data[self.acc_sub_con].values

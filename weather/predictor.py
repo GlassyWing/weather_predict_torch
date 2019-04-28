@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-import pandas as pd
 import torch
 import torch.nn as nn
 
@@ -36,11 +35,10 @@ def weather_predict(net: nn.Module, pre_weather: PreWeatherDataset, num_future=1
             output['month'] = curr_date.month
             output['day'] = curr_date.day
 
-            if pre_weather.transform is not None:
-                output = pd.DataFrame(data=output, index=[0])
-                output[pre_weather.according] = pre_weather.transform.I()(output[pre_weather.according])
-                output = output.to_dict('index')[0]
-
             pre_weather.append(output)
+
+    if pre_weather.transform is not None:
+        pre_weather.weather[pre_weather.according] = pre_weather.transform.I()(
+            pre_weather.weather[pre_weather.according])
 
     return pre_weather.weather
