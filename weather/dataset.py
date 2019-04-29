@@ -5,6 +5,7 @@ from functools import reduce
 import numpy as np
 import pandas as pd
 import torch
+from math import ceil
 from torch.utils.data import Dataset
 
 
@@ -86,7 +87,8 @@ class WeatherDataset(Dataset, ABC):
                  according=None,
                  conclusion=None,
                  is_reverse=False,
-                 transform=None):
+                 transform=None,
+                 rolling=None):
         """
         初始化气象数据集
         :param weather_file_path: 气象数据文件路径
@@ -96,6 +98,7 @@ class WeatherDataset(Dataset, ABC):
         :param conclusion: 结论列
         :param is_reverse: 指定载入的数据集是否为逆序
         :param transform: 数据变换
+        :param rolling: 滑动平均窗口大小
         """
         self.transform = transform
         self.requires = ['place',
@@ -149,6 +152,12 @@ class WeatherDataset(Dataset, ABC):
         self.weathers = self.__split_by_place()
         self.__breakpoint = self.__weathers_breakpoint()
 
+        # 执行滑动平均
+        if rolling is not None and rolling >= 2:
+            for i, weather in enumerate(self.weathers, 0):
+                weather[self.conclusion] = weather[self.conclusion].copy().rolling(rolling).mean()
+                self.weathers[i] = weather[rolling:]
+
     def calculate_size(self):
         total_size = 0
         for i in range(len(self.weathers)):
@@ -156,7 +165,7 @@ class WeatherDataset(Dataset, ABC):
         return total_size
 
     def __split_by_place(self):
-        return [self.weather[self.weather['place'] == place] for place in self.places]
+        return [self.weather[self.weather['place'] == place].copy() for place in self.places]
 
     def __weathers_breakpoint(self):
         init = [0]
@@ -217,9 +226,9 @@ class PreWeatherDataset(WeatherDataset):
 
     def get_curr_date(self):
         curr_date = datetime.strptime(
-            str(self.weather['year'].iloc[-1]) +
-            '/' + str(self.weather['month'].iloc[-1]) +
-            '/' + str(self.weather['day'].iloc[-1]),
+            str(ceil(self.weather['year'].iloc[-1])) +
+            '/' + str(ceil(self.weather['month'].iloc[-1])) +
+            '/' + str(ceil(self.weather['day'].iloc[-1])),
             '%Y/%m/%d')
         return curr_date
 
