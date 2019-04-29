@@ -38,15 +38,13 @@ class ScaleApply(nn.Module, ABC):
 
     def __init__(self, input_size, hidden_size, seq_len=15):
         super().__init__()
-        self.norm = nn.BatchNorm1d(seq_len)
         self.linear = nn.Linear(input_size, hidden_size)
         self.fc = nn.Linear(hidden_size, 2)
         self.fc.bias.data[0] = 1
         self.fc.bias.data[1] = 0.5
 
-    def forward(self, x, addition):
-        out = self.norm(addition)  # [b, s, i]
-        out = self.linear(out)  # [b, s, h]
+    def forward(self, x, position):
+        out = self.linear(position)  # [b, s, h]
         out = F.relu(out)
         out = self.fc(out)
         gamma, beta = out.chunk(2, 2)  # [b, s, 1]
@@ -57,7 +55,7 @@ class ScaleApply(nn.Module, ABC):
 class WeatherModel(nn.Module, ABC):
 
     def __init__(self,
-                 addition_size,
+                 position_size,
                  input_size,
                  hidden_size,
                  inner_hidden_size,
@@ -66,30 +64,34 @@ class WeatherModel(nn.Module, ABC):
                  dropout=0.2):
         super().__init__()
 
-        self.wave_model = BaseModel(input_size=input_size + addition_size,
+        self.wave_model = BaseModel(input_size=input_size + position_size,
                                     hidden_size=hidden_size,
                                     inner_hidden_size=inner_hidden_size,
                                     max_len=max_len,
                                     dropout=dropout,
                                     num_layers=num_layers)
 
-        self.scale = ScaleApply(input_size=addition_size,
+        self.position_norm = nn.BatchNorm1d(max_len)
+
+        self.scale = ScaleApply(input_size=position_size,
                                 hidden_size=hidden_size,
                                 seq_len=max_len)
 
         self.fc = nn.Linear(inner_hidden_size, input_size)
 
-    def forward(self, x, addition):
+    def forward(self, x, position):
         """
 
         :param x: shape of [b, s, input_size]
-        :param addition: shape of [b, s, addition_size]
+        :param position: shape of [b, s, addition_size]
         :return:
         """
 
-        input = torch.cat((x, addition), dim=2)
+        position = self.position_norm(position)
+        input = torch.cat((x, position), dim=2)
+
         wave_out, attn_weights = self.wave_model(input)
-        scale_out = self.scale(wave_out, addition)
+        scale_out = self.scale(wave_out, position)
 
         cross = scale_out + wave_out
         out = self.fc(cross)
