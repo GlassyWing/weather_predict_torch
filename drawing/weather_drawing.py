@@ -15,6 +15,7 @@ def weather_compare(true_data, fake_data, column, save_path=None):
     ys = np.concatenate((true_ys, fake_ys), axis=1)
 
     plt.figure(figsize=(15, 5))
+    plt.grid()
     plt.plot(xs, ys)
     plt.legend(['true', 'fake'])
     if save_path is not None:
@@ -48,6 +49,7 @@ def weather_draw(data, transform=None, condition=None, reverse=False, save_path=
         ys = weather_df[columns].values
 
     plt.figure(figsize=(15, 5))
+    plt.grid()
     plt.plot(xs, ys)
     plt.legend(columns)
     if save_path is not None:

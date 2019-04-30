@@ -150,13 +150,15 @@ class WeatherDataset(Dataset, ABC):
         self.places = self.weather['place'].unique().tolist()
         self.num_place = len(self.places)
         self.weathers = self.__split_by_place()
-        self.__breakpoint = self.__weathers_breakpoint()
+
 
         # 执行滑动平均
         if rolling is not None and rolling >= 2:
             for i, weather in enumerate(self.weathers, 0):
                 weather[self.conclusion] = weather[self.conclusion].copy().rolling(rolling).mean()
                 self.weathers[i] = weather[rolling:]
+
+        self.__breakpoint = self.__weathers_breakpoint()
 
     def calculate_size(self):
         total_size = 0
@@ -213,6 +215,7 @@ class PreWeatherDataset(WeatherDataset):
 
     def __init__(self, weather_file_path, places_dict_path, **kwargs):
         super().__init__(weather_file_path, places_dict_path, **kwargs)
+        self.weather = self.weathers[0]
         self.weather = self.weather[0: self.seq_len]
 
     def calculate_size(self):
