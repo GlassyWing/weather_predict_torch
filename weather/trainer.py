@@ -65,18 +65,18 @@ def weather_train(net: nn.Module,
         logs = {}
         time_since_last = time()
         for i, data in enumerate(train_dataloader, 0):
-            x, y, addition = data.values()
-            x, y, addition = x.float(), y.float(), addition.float()
-            x, y, addition = x.to(device), y.to(device), addition.to(device)
+            enc_inputs, target, dec_inputs = data.values()
+            enc_inputs, target, dec_inputs = enc_inputs.float(), target.float(), dec_inputs.float()
+            enc_inputs, target, dec_inputs = enc_inputs.to(device), target.to(device), dec_inputs.to(device)
 
             optimizer.zero_grad()
 
-            outputs, _ = net(x, addition)
-            loss = criterion(outputs, y)
+            outputs, _, _ = net(enc_inputs, dec_inputs)
+            loss = criterion(outputs, target)
             loss.backward(torch.ones_like(loss.data))
             optimizer.step()
 
-            running_loss += loss.mean().item()
+            running_loss += loss.item()
 
             if i % log_steps == log_steps - 1:
                 train_loss = running_loss / log_steps
@@ -91,12 +91,12 @@ def weather_train(net: nn.Module,
             val_loss = 0.0
             with torch.no_grad():
                 for data in test_dataloader:
-                    input, target, addition = data.values()
-                    input, target, addition = input.float().to(device), target.float().to(device), \
-                                              addition.float().to(device)
-                    outputs, _ = net(input, addition)
+                    enc_inputs, target, dec_inputs = data.values()
+                    enc_inputs, target, dec_inputs = enc_inputs.float().to(device), target.float().to(device), \
+                                                     dec_inputs.float().to(device)
+                    outputs, _, _ = net(enc_inputs, dec_inputs)
                     loss = criterion(outputs, target)
-                    val_loss += loss.mean().item()
+                    val_loss += loss.item()
 
             val_loss = val_loss / len(test_dataloader)
             logs['val_loss'] = val_loss

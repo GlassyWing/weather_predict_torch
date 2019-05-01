@@ -1,5 +1,5 @@
 from abc import ABC
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import reduce
 
 import numpy as np
@@ -83,7 +83,8 @@ class WeatherDataset(Dataset, ABC):
 
     def __init__(self, weather_file_path,
                  places_dict_path,
-                 seq_len=15,
+                 src_seq_len=15,
+                 tgt_seq_len=15,
                  according=None,
                  conclusion=None,
                  is_reverse=False,
@@ -93,7 +94,8 @@ class WeatherDataset(Dataset, ABC):
         初始化气象数据集
         :param weather_file_path: 气象数据文件路径
         :param places_dict_path: 地点字典
-        :param seq_len:     序列长度
+        :param src_seq_len:     原始序列长度
+        :param tgt_seq_len:     目标序列长度
         :param according:  根据列
         :param conclusion: 结论列
         :param is_reverse: 指定载入的数据集是否为逆序
@@ -134,7 +136,8 @@ class WeatherDataset(Dataset, ABC):
         self.acc_sub_con = list(set(self.according) - set(self.conclusion))
         self.acc_sub_con.sort()
 
-        self.seq_len = seq_len
+        self.src_seq_len = src_seq_len
+        self.tgt_seq_len = tgt_seq_len
         self.index2place, self.place2index = get_place_dict(places_dict_path)
         self.weather = mapping_place(weather_file_path, place2index=self.place2index)
         self.__check_data(self.weather)
@@ -151,7 +154,6 @@ class WeatherDataset(Dataset, ABC):
         self.num_place = len(self.places)
         self.weathers = self.__split_by_place()
 
-
         # 执行滑动平均
         if rolling is not None and rolling >= 2:
             for i, weather in enumerate(self.weathers, 0):
@@ -163,7 +165,7 @@ class WeatherDataset(Dataset, ABC):
     def calculate_size(self):
         total_size = 0
         for i in range(len(self.weathers)):
-            total_size += len(self.weathers[i]) - self.seq_len - 1
+            total_size += len(self.weathers[i]) - self.src_seq_len - self.tgt_seq_len
         return total_size
 
     def __split_by_place(self):
@@ -172,7 +174,7 @@ class WeatherDataset(Dataset, ABC):
     def __weathers_breakpoint(self):
         init = [0]
         for i in range(1, len(self.weathers)):
-            init.append(init[i - 1] + len(self.weathers[i]) - self.seq_len - 1)
+            init.append(init[i - 1] + len(self.weathers[i]) - self.src_seq_len - self.tgt_seq_len)
         return init
 
     def __getitem__(self, item):
@@ -187,11 +189,11 @@ class WeatherDataset(Dataset, ABC):
             idx = idx[0] - 1
 
         offset = item - self.__breakpoint[idx]
-        data = self.weathers[idx + 1][offset: offset + 1 + self.seq_len]
+        data = self.weathers[idx + 1][offset: offset + self.src_seq_len + self.tgt_seq_len]
 
-        x = data[self.conclusion][:-1].values
-        y = data[self.conclusion][1:].values
-        additional = data[self.acc_sub_con][:-1].values
+        x = data[self.conclusion][:self.src_seq_len].values
+        y = data[self.conclusion][self.src_seq_len:].values
+        additional = data[self.acc_sub_con][self.src_seq_len:].values
 
         return {
             'input': torch.from_numpy(x),
@@ -215,14 +217,23 @@ class PreWeatherDataset(WeatherDataset):
 
     def __init__(self, weather_file_path, places_dict_path, **kwargs):
         super().__init__(weather_file_path, places_dict_path, **kwargs)
-        self.weather = self.weathers[0]
-        self.weather = self.weather[0: self.seq_len]
 
-    def calculate_size(self):
         if self.num_place != 1:
             raise ValueError("所有气象数据的地点应相同！")
-        total_size = len(self.weather) - self.seq_len + 1
-        return total_size
+
+        self.weather = self.weathers[0]
+        self.weather = self.weather[: self.src_seq_len]
+
+        dec_input = np.zeros(shape=(self.tgt_seq_len, 4))
+
+        place = self.get_place()
+        next_date = self.get_curr_date()
+
+        for i in range(self.tgt_seq_len):
+            next_date = next_date + timedelta(days=1)
+            dec_input[i, :] = np.array([place, next_date.year, next_date.month, next_date.day], dtype='float32')
+
+        self.future_position = pd.DataFrame(dec_input, columns=['place', 'year', 'month', 'day'])
 
     def get_place(self):
         return self.weather['place'].iloc[-1]
@@ -235,20 +246,22 @@ class PreWeatherDataset(WeatherDataset):
             '%Y/%m/%d')
         return curr_date
 
-    def append(self, value):
-        """添加一行数据"""
-        self.weather = self.weather.append(value, ignore_index=True, sort=False)
+    def append(self, values):
+        """添加数据"""
+        future_data = pd.DataFrame(data=values, columns=self.conclusion)
+        future_data = pd.concat((self.future_position, future_data), axis=1, sort=False)
+        self.weather = pd.concat((self.weather, future_data), axis=0, sort=False)
+
+        if self.transform is not None:
+            self.weather[self.according] = self.transform.I()(self.weather[self.according])
 
     def __getitem__(self, item):
-        data = self.weather[item: item + self.seq_len]
-
-        input = data[self.conclusion].values
-        addition = data[self.acc_sub_con].values
-
+        enc_input = self.weather[self.conclusion].values
+        dec_input = self.future_position[self.acc_sub_con].values
         return {
-            "input": torch.from_numpy(input),
-            "addition": torch.from_numpy(addition)
+            "input": torch.from_numpy(enc_input),
+            "addition": torch.from_numpy(dec_input)
         }
 
     def __len__(self):
-        return self.calculate_size()
+        return 1
