@@ -5,6 +5,23 @@ import torch
 import torch.nn.functional as F
 
 
+class ScaleApply(nn.Module, ABC):
+    """依据当前的时间、地点或其它特征"""
+
+    def __init__(self, input_size, hidden_size, output_size):
+        super().__init__()
+        self.linear = nn.Linear(input_size, hidden_size)
+        self.fc = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        out = self.linear(x)  # [b, s, h]
+        out = F.relu(out)
+        out = self.fc(out)
+        out = F.relu(out)
+
+        return out
+
+
 class EncoderRNN(nn.Module, ABC):
 
     def __init__(self, input_size, hidden_size, num_layers=2, dropout_p=0.1):
@@ -45,8 +62,10 @@ class AttnDecoderRNN(nn.Module):
 
         self.attn_combine = nn.Linear(self.hidden_size * 2, self.hidden_size)
         self.dropout = nn.Dropout(self.dropout_p)
-        self.gru = nn.GRU(self.input_size, self.hidden_size, num_layers=num_layers, batch_first=True)
+        self.gru = nn.GRU(self.output_size, self.hidden_size, num_layers=num_layers, batch_first=True)
         self.out = nn.Linear(self.hidden_size, self.output_size)
+
+        self.scale = ScaleApply(input_size=input_size, hidden_size=hidden_size, output_size=output_size)
 
     def forward(self, inputs, encoder_hidden, encoder_outputs):
         """
@@ -59,13 +78,25 @@ class AttnDecoderRNN(nn.Module):
                  - **attn_weights**: of shape [max_length, 1, input_seq_length]
         """
 
-        decoder_input = inputs
+        decoder_outputs = []
+        attn_weights = []
+
+        decoder_input = torch.zeros(inputs.size(0), 1, self.output_size).to(inputs.device)  # (batch, 1, input_size)
         decoder_hidden = encoder_hidden
 
-        # The reason not use Teacher Forcing is: the data type is discrete
-        decoder_output, decoder_hidden, attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs)
+        # The reason not use Teacher Forcing is: the data type is discrete, can't benefit from it, and the network
+        # degenerates into a single RNN
+        for di in range(inputs.size(1)):
+            decoder_output, decoder_hidden, attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs)
+            decoder_input = self.scale(inputs[:, di, :].unsqueeze(1))
 
-        return decoder_output, decoder_hidden, attn
+            decoder_outputs.append(decoder_output[:, 0])
+            attn_weights.append(attn.squeeze(1))
+
+        decoder_outputs = torch.stack(tuple(decoder_outputs), dim=1)
+        attn_weights = torch.stack(tuple(attn_weights), dim=1)
+
+        return decoder_outputs, decoder_hidden, attn_weights
 
     def forward_step(self, input, hidden, encoder_outputs):
         """
@@ -88,6 +119,7 @@ class AttnDecoderRNN(nn.Module):
         attn_applied = torch.bmm(attn_weights, encoder_outputs)  # (batch, out_len, hidden_dim)
         combined = torch.cat((attn_applied, output), dim=2)  # (batch, out_len, 2 * hidden_dim)
         output = F.relu(self.attn_combine(combined))  # (batch, out_len, hidden_dim)
+        # output = self.dropout(output)
         output = self.out(output)  # (batch, out_len, out_size)
 
         return output, hidden, attn_weights
@@ -97,6 +129,7 @@ class WeatherModel(nn.Module):
 
     def __init__(self, enc_input_size,
                  dec_input_size,
+                 output_size,
                  hidden_size,
                  num_layers=2,
                  dropout_p=0.2):
@@ -108,7 +141,7 @@ class WeatherModel(nn.Module):
         self.decoder = AttnDecoderRNN(
             input_size=dec_input_size,
             hidden_size=hidden_size,
-            output_size=enc_input_size,
+            output_size=output_size,
             num_layers=num_layers,
             dropout_p=dropout_p)
 

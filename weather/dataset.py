@@ -165,7 +165,8 @@ class WeatherDataset(Dataset, ABC):
     def calculate_size(self):
         total_size = 0
         for i in range(len(self.weathers)):
-            total_size += len(self.weathers[i]) - self.src_seq_len - self.tgt_seq_len
+            size_i = len(self.weathers[i]) - self.src_seq_len - self.tgt_seq_len
+            total_size += size_i
         return total_size
 
     def __split_by_place(self):
@@ -194,6 +195,7 @@ class WeatherDataset(Dataset, ABC):
         x = data[self.conclusion][:self.src_seq_len].values
         y = data[self.conclusion][self.src_seq_len:].values
         additional = data[self.acc_sub_con][self.src_seq_len:].values
+        # additional = np.zeros_like(y)
 
         return {
             'input': torch.from_numpy(x),
@@ -257,6 +259,7 @@ class PreWeatherDataset(WeatherDataset):
 
     def __getitem__(self, item):
         enc_input = self.weather[self.conclusion].values
+        # dec_input = np.zeros(shape=(self.tgt_seq_len, enc_input.shape[1]))
         dec_input = self.future_position[self.acc_sub_con].values
         return {
             "input": torch.from_numpy(enc_input),
